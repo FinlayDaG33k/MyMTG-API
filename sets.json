@@ -106,7 +106,7 @@
 {"code":"EVE","Name":"Eventide"},
 {"code":"DRB","Name":"From the Vault: Dragons"},
 {"code":"ME2","Name":"Masters Edition II"},
-{"code":"WPN","Name":"Wizards Play Network"},
+{"code":"pWPN","Name":"Wizards Play Network"},
 {"code":"ALA","Name":"Shards of Alara"},
 {"code":"DD2","Name":"Duel Decks: Jace vs. Chandra"},
 {"code":"CON","Name":"Conflux"},
@@ -196,11 +196,12 @@
 {"code":"CN2","Name":"Conspiracy: Take the Crown"},
 {"code":"DDR","Name":"Duel Decks: Nissa vs. Ob Nixilis"},
 {"code":"KLD","Name":"Kaladesh"},
-{"code":"MPS","Name":"Masterpiece Series: Kaladesh Inventions"},
+{"code":"MPS: KLD","Name":"Masterpiece Series: Kaladesh Inventions"},
 {"code":"C16","Name":"Commander 2016"},
 {"code":"PCA","Name":"Planechase Anthology"},
 {"code":"AER","Name":"Aether Revolt"},
 {"code":"MM3","Name":"Modern Masters 2017 Edition"},
 {"code":"AKH","Name":"Amonkhet"},
+{"code":"MPS: AKH","Name":"Masterpiece Series: Amonkhet Invocations"},
 {"code":"HOU","Name":"Hour of Devastation"}
 ]

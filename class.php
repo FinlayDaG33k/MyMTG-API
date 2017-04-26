@@ -48,6 +48,29 @@ Class MyMTG{
 		$conn->close();
 	}
 
+	function editProfile($config,$data){
+		$conn = new mysqli($config['db']['Host'], $config['db']['Username'], $config['db']['Password'], $config['db']['Dbname']);
+		$sql = "SELECT `ID`,`Username` FROM `Users` WHERE `Username`='".mysqli_real_escape_string($conn,$data['Username'])."' AND `Authtoken` = '".mysqli_real_escape_string($conn,$data['Authtoken'])."';";
+		$result = $conn->query($sql);
+		if($result->num_rows > 0){
+			$user_row = $result->fetch_assoc();
+			$sql = "SELECT `Userdetails` FROM `UserDetails` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."';";
+			$result = $conn->query($sql);
+			if($result->num_rows > 0){
+				$sql = "UPDATE `UserDetails` SET `Userdetails`='".json_encode(array("DCI" => mysqli_real_escape_string($conn,$data['DCINumber']),"Name"=>mysqli_real_escape_string($conn,$data['realName'])))."' WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."';";
+				if($conn->query($sql)){
+					return "{\"code\":200,\"Message\":\"Profile update Success!!\"}";
+				}else{
+					return "{\"code\":500,\"Message\":\"Couldn't update profile!\"}";
+				}
+			}else{
+				return "Userdetails not found!";
+			}
+		}else{
+			return "Invalid Token!";
+		}
+	}
+
 	function addHave($config,$data){
 		$ch = curl_init(); // create a new cURL resource
 
@@ -63,6 +86,15 @@ Class MyMTG{
 		curl_close($ch);
 
 		if($httpcode == 200){
+			$ch = curl_init(); // create a new cURL resource
+
+			// set URL and other appropriate options
+			curl_setopt($ch, CURLOPT_URL, "https://api.magicthegathering.io/v1/cards?set=".urlencode($data['Set'])."&name=%22".urlencode($data['Card'])."%22");
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER,1);
+			$mtgresult = json_decode(curl_exec($ch),1);
+			// close cURL resource, and free up system resources
+			curl_close($ch);
+
 			$conn = new mysqli($config['db']['Host'], $config['db']['Username'], $config['db']['Password'], $config['db']['Dbname']);
 			$sql = "SELECT `ID`,`Username` FROM `Users` WHERE `Username`='".mysqli_real_escape_string($conn,$data['Username'])."' AND `Authtoken` = '".mysqli_real_escape_string($conn,$data['Authtoken'])."';";
 			$result = $conn->query($sql);
@@ -78,7 +110,7 @@ Class MyMTG{
 						$inventory[$key[0]]['Foils'] = $inventory[$key[0]]['Foils'] + $data['Foils'];
 						$inventory[$key[0]]['Non-Foils'] = $inventory[$key[0]]['Non-Foils'] + $data['Non-Foils'];
 					}else{
-						array_push($inventory,array("Name" => $data["Card"],"Set"=>$data['Set'],"Foils" => $data["Foils"],"Non-Foils" => $data["Non-Foils"]));
+						array_push($inventory,array("Name" => $data["Card"],"Set"=>$data['Set'],'Rarity' => $mtgresult['cards'][0]['rarity'],"Foils" => $data["Foils"],"Non-Foils" => $data["Non-Foils"]));
 					}
 					sort($inventory);
 					$inventory = json_encode($inventory);
@@ -248,7 +280,7 @@ Class MyMTG{
 				if($result->num_rows > 0){
 					return "{\"code\":403,\"message\":\"Email Taken\"}";
 				}else{
-					$sql = "INSERT INTO `Users` (`ID`, `Username`, `Password`, `Email`, `Authtoken`, `Activation_key`, `Reset_key`) VALUES (NULL, '".mysqli_real_escape_string($conn,$data['Username'])."', '".mysqli_real_escape_string($conn,password_hash($data['Password'],PASSWORD_DEFAULT))."', '".mysqli_real_escape_string($conn,$data['Email'])."', '', '', '');INSERT INTO `Inventories` (`ID`,`Inventory`) VALUES (NULL,'".json_encode(array())."');";
+					$sql = "INSERT INTO `Users` (`ID`, `Username`, `Password`, `Email`, `Authtoken`, `Activated`,`Activation_key`, `Reset_key`) VALUES (NULL, '".mysqli_real_escape_string($conn,$data['Username'])."', '".mysqli_real_escape_string($conn,password_hash($data['Password'],PASSWORD_DEFAULT))."', '".mysqli_real_escape_string($conn,$data['Email'])."', '', '0','', '');INSERT INTO `Inventories` (`ID`,`Inventory`) VALUES (NULL,'".json_encode(array())."');INSERT INTO `Wants` (`ID`, `Wants`) VALUES (NULL,'".json_encode(array())."');INSERT INTO `UserDetails` (`ID`, `UserDetails`) VALUES (NULL, '".json_encode(array("DCI" => 0))."');";
 					if($conn->multi_query($sql)){
 						return "{\"code\":200,\"message\":\"Registration success!\"}";
 					}else{
@@ -338,12 +370,15 @@ Class MyMTG{
 		$result = $conn->query($sql);
     if($result->num_rows > 0){
     	$user_row = $result->fetch_assoc();
-			$sql = "SELECT `Inventory`, NULL as `Wants` FROM `Inventories` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."' UNION ALL SELECT NULL as `Inventory`, `Wants` From `Wants` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."';";
+			$sql = "SELECT `Userdetails`, NULL as `Inventory`, NULL as `Wants` FROM `UserDetails` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."'
+UNION ALL SELECT NULL as `UderDetails`, `Inventory`, NULL as `Wants` FROM `Inventories` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."'
+UNION ALL SELECT NULL as `UderDetails`, NULL as `Inventory`, `Wants` From `Wants` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."';";
 			$result = $conn->query($sql);
 			if($result->num_rows > 0){
+				$UserDetails = json_decode($result->fetch_assoc()['Userdetails']);
 				$inventory = json_decode($result->fetch_assoc()['Inventory']);
 				$wants = json_decode($result->fetch_assoc()['Wants']);
-				$data = array("Username"=>$user_row['Username'],"Inventory" => $inventory,"Wants"=>$wants);
+				$data = array("Username"=>$user_row['Username'],"UserDetails" =>$UserDetails, "Inventory" => $inventory,"Wants"=>$wants);
     		return json_encode($data);
 			}else{
 				return "Inventory not found!";

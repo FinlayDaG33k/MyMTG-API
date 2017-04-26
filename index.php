@@ -41,6 +41,13 @@
 					echo "{\"code\":400,\"Message\":\"Invalid Captcha\"}";
 				}
 				break;
+			case "editProfile":
+				if($MyMTG->checkCaptcha($config,$_POST)){
+					echo $MyMTG->editProfile($config,$_POST);
+				}else{
+					echo "{\"code\":400,\"Message\":\"Invalid Captcha\"}";
+				}
+				break;
 		}
 	}else{
 		if(!empty($_GET['authtoken'])){
