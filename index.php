@@ -27,6 +27,12 @@
 			case "updateWant":
 				echo $MyMTG->updateWant($config,$_POST);
 				break;
+			case "addTrade":
+				echo $MyMTG->addTrade($config,$_POST);
+				break;
+			case "updateTrade":
+				echo $MyMTG->updateTrade($config,$_POST);
+				break;
 			case "changePassword":
 				if($MyMTG->checkCaptcha($config,$_POST)){
 					echo $MyMTG->changePassword($config,$_POST);
@@ -57,6 +63,9 @@
 					break;
 				case "listWants":
 					echo $MyMTG->listWants($config,$_GET['username'],$_GET['authtoken']);
+					break;
+				case "listTrades":
+					echo $MyMTG->listTrades($config,$_GET);
 					break;
 				Default:
 					echo $MyMTG->getUser($config,$_GET['username'],$_GET['authtoken']);

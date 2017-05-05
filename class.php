@@ -1,6 +1,5 @@
 <?php
 Class MyMTG{
-
 	function generateRandomString($length = 10) {
     $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
     $charactersLength = strlen($characters);
@@ -32,6 +31,81 @@ Class MyMTG{
 
 	function listSets(){
 		return file_get_contents('sets.json');
+	}
+
+	function listTrades($config,$data){
+		$conn = new mysqli($config['db']['Host'], $config['db']['Username'], $config['db']['Password'], $config['db']['Dbname']);
+		$sql = "SELECT `ID`,`Username` FROM `Users` WHERE `Username`='".mysqli_real_escape_string($conn,$data['username'])."' AND `Authtoken` = '".mysqli_real_escape_string($conn,$data['authtoken'])."';";
+		$result = $conn->query($sql);
+		if($result->num_rows > 0){
+			$user_row = $result->fetch_assoc();
+			$sql = "SELECT * FROM `Trades` WHERE `User`='".mysqli_real_escape_string($conn,$user_row['ID'])."';";
+			$result = $conn->query($sql);
+			if($result->num_rows > 0){
+				$trades = array();
+				while($trade = $result->fetch_assoc()){
+					$tradeID = $trade['ID'];
+					$gives = json_decode($trade['Gives'],1);
+					$gets = json_decode($trade['Gets'],1);
+					array_push($trades, array("ID" => $tradeID, "Date_Created" => $trade['Date_Created'],"Last_Updated"=> $trade['Last_Updated'], "Status"=> $trade['Status'], "Cards" => array("Gives" => $gives, "Gets" => $gets)));
+				}
+				return json_encode(array("Status" => 200, "Trades" => $trades));
+			}else{
+				return "No Trades Found";
+			}
+		}else{
+			return "Invalid Token!";
+		}
+		$conn->close();
+	}
+
+	function addTrade($config,$data){
+		$conn = new mysqli($config['db']['Host'], $config['db']['Username'], $config['db']['Password'], $config['db']['Dbname']);
+		$sql = "SELECT `ID`,`Username` FROM `Users` WHERE `Username`='".mysqli_real_escape_string($conn,$data['Username'])."' AND `Authtoken` = '".mysqli_real_escape_string($conn,$data['Authtoken'])."';";
+		$result = $conn->query($sql);
+		if($result->num_rows > 0){
+			$user_row = $result->fetch_assoc();
+
+			$gives = array();
+			$gets = array();
+			foreach(preg_split("/((\r?\n)|(\r\n?))/", $data['Gives']) as $line){
+				$card = explode("x",$line);
+
+				$gives[trim($card[1])] = $card[0];
+			}
+
+			foreach(preg_split("/((\r?\n)|(\r\n?))/", $data['Gets']) as $line){
+				$card = explode("x",$line);
+				$gets[trim($card[1])] = $card[0];
+			}
+			$sql = "INSERT INTO `Trades` (`ID`,`User`,`Gives`,`Gets`,`Date_Created`,`Last_Updated`,`Status`) VALUES (NULL,'".mysqli_real_escape_string($conn,$user_row['ID'])."','".mysqli_real_escape_string($conn,json_encode($gives))."','".mysqli_real_escape_string($conn,json_encode($gets))."','".date("Y-m-d h:i:s")."','".date("Y-m-d h:i:s")."','".mysqli_real_escape_string($conn,$data['Status'])."');";
+			if($conn->query($sql)){
+				return "{\"code\":200,\"Message\":\"Added trade!\"}";
+			}else{
+				return "{\"code\":500,\"Message\":\"Couldn't add trade!\"}";
+			}
+		}else{
+			return "Invalid Token!";
+		}
+		$conn->close();
+	}
+
+	function updateTrade($config,$data){
+		$conn = new mysqli($config['db']['Host'], $config['db']['Username'], $config['db']['Password'], $config['db']['Dbname']);
+		$sql = "SELECT `ID`,`Username` FROM `Users` WHERE `Username`='".mysqli_real_escape_string($conn,$data['Username'])."' AND `Authtoken` = '".mysqli_real_escape_string($conn,$data['Authtoken'])."';";
+		$result = $conn->query($sql);
+		if($result->num_rows > 0){
+			$user_row = $result->fetch_assoc();
+			$sql = "UPDATE `Trades` SET `Status`='".mysqli_real_escape_string($conn,$data['Status'])."', `Last_Updated`='".date("Y-m-d h:i:s")."' WHERE `ID`='".mysqli_real_escape_string($conn,$data['TradeID'])."' AND `User`='".mysqli_real_escape_string($conn,$user_row['ID'])."';";
+			if($conn->query($sql)){
+				return "{\"code\":200,\"Message\":\"Updated trade!\"}";
+			}else{
+				return "{\"code\":500,\"Message\":\"Couldn't update trade!\"}";
+			}
+		}else{
+			return "Invalid Token!";
+		}
+		$conn->close();
 	}
 
 	function getUser($config,$Username,$Authtoken){
@@ -370,19 +444,51 @@ Class MyMTG{
 		$result = $conn->query($sql);
     if($result->num_rows > 0){
     	$user_row = $result->fetch_assoc();
-			$sql = "SELECT `Userdetails`, NULL as `Inventory`, NULL as `Wants` FROM `UserDetails` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."'
-UNION ALL SELECT NULL as `UderDetails`, `Inventory`, NULL as `Wants` FROM `Inventories` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."'
-UNION ALL SELECT NULL as `UderDetails`, NULL as `Inventory`, `Wants` From `Wants` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."';";
+
+			$data = array("Username"=>$user_row['Username'],"Trades"=>array());
+
+			// Get the user details
+			$sql = "SELECT `Userdetails` FROM `UserDetails` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."';";
 			$result = $conn->query($sql);
 			if($result->num_rows > 0){
-				$UserDetails = json_decode($result->fetch_assoc()['Userdetails']);
-				$inventory = json_decode($result->fetch_assoc()['Inventory']);
-				$wants = json_decode($result->fetch_assoc()['Wants']);
-				$data = array("Username"=>$user_row['Username'],"UserDetails" =>$UserDetails, "Inventory" => $inventory,"Wants"=>$wants);
-    		return json_encode($data);
+				$data['UserDetails'] = json_decode($result->fetch_assoc()['Userdetails'],1);
 			}else{
-				return "Inventory not found!";
+				$data['UserDetails'] = array();
 			}
+
+			// Get the inventory
+			$sql = "SELECT `Inventory` FROM `Inventories` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."'";
+			$result = $conn->query($sql);
+			if($result->num_rows > 0){
+				$data['Inventory'] = json_decode($result->fetch_assoc()['Inventory'],1);
+			}else{
+				$data['Inventory'] = array();
+			}
+
+			// Get the Wants
+			$sql = "SELECT `Wants` FROM `Wants` WHERE `ID` = '".mysqli_real_escape_string($conn,$user_row['ID'])."';";
+			$result = $conn->query($sql);
+			if($result->num_rows > 0){
+				$data['Wants'] = json_decode($result->fetch_assoc()['Wants'],1);
+			}else{
+				$data['Wants'] = array();
+			}
+
+			// Get the Trades
+			$sql = "SELECT * FROM `Trades` WHERE `User` = '".mysqli_real_escape_string($conn,$user_row['ID'])."';";
+			$result = $conn->query($sql);
+			if($result->num_rows > 0){
+				while($trade = $result->fetch_assoc()){
+					$tradeID = $trade['ID'];
+					$gives = json_decode($trade['Gives'],1);
+					$gets = json_decode($trade['Gets'],1);
+					array_push($data['Trades'], array("ID" => $tradeID, "Date_Created" => $trade['Date_Created'],"Last_Updated"=> $trade['Last_Updated'], "Status"=> $trade['Status'], "Cards" => array("Gives" => $gives, "Gets" => $gets)));
+				}
+			}else{
+				$data['Trades'] = array();
+			}
+
+    	return json_encode($data);
     }else{
       return "Invalid User";
     }
